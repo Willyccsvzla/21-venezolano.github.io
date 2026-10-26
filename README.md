@@ -1,1 +1,3 @@
-# 21-venezolano.github.io
+# 21 Venezolano
+
+Juego web de 21 venezolano.
