@@ -92,7 +92,7 @@ export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
 
 // Built separately so the `betterAuth({...})` call stays easy to edit without
 // breaking brackets (models often trip on the conditional plugin spread).
-export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
+
 
 export const auth = betterAuth({
   baseURL,
