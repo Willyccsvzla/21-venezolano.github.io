@@ -8,7 +8,11 @@ import { Rng } from './rng';
 import type { Action, BotProfile } from './types';
 
 // Distribución de la suma de 3 cartas de la baraja de 40 (C(40,3) = 9880 combinaciones).
-const DIST3: number[] = (() => {
+// Se calcula al primer uso: si corre al importar, el bundle del servidor llama
+// createDeck() antes de que SUITS exista y la lista de salas se cae.
+let dist3: number[] | null = null;
+function dist3of(): number[] {
+  if (dist3) return dist3;
   const vals = createDeck().map(cardValue);
   const d = new Array(22).fill(0);
   let total = 0;
@@ -16,11 +20,13 @@ const DIST3: number[] = (() => {
     d[vals[i] + vals[j] + vals[k]]++;
     total++;
   }
-  return d.map((x) => x / total);
-})();
+  dist3 = d.map((x) => x / total);
+  return dist3;
+}
 
 /** P(rival < s) + 0.5·P(rival = s) */
 export function beatProb(score: number): number {
+  const DIST3 = dist3of();
   if (score > 21) return 0;
   let p = 0;
   for (let v = 0; v < score; v++) p += DIST3[v];
