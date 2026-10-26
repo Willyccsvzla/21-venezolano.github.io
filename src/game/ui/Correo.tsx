@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { authClient, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
+import { authClient, GOOGLE_PROVIDERS, signIn } from "@/lib/auth/client";
 import { savePlayer } from "@/lib/player.functions";
 import { Reglas } from "./Reglas";
 import { rememberInvite } from "./invite";
@@ -115,7 +115,7 @@ export function Correo() {
           {busy ? "Un momento…" : mode === "crear" ? "Crear cuenta y jugar" : "Entrar a la mesa"}
         </button>
         <div className="oauth">
-          {GROK_PROVIDERS.map((p) => (
+          {GOOGLE_PROVIDERS.map((p) => (
             <button key={p.providerId} type="button" className="btn ghost" onClick={() => { rememberInvite(); void signIn(p.providerId, { callbackURL: `${window.location.pathname}${window.location.search}` }); }}>
               {p.label}
             </button>
