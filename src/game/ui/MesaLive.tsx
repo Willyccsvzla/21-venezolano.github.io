@@ -154,7 +154,18 @@ export function MesaLive({ profile, onLeave, onBalance }: {
   );
 
   const resultText = snap.result
-    ? `${iWon ? "¡Ganas" : `${opponents.find((o) => o.seat === snap.result?.winnerSeat)?.name ?? snap.you.name} gana`} ${snap.result.won}${snap.result.reason === "retirada" ? " sin mostrar" : ""}${iWon ? "!" : ""}`
+    ? (() => {
+        const winnerName = snap.result.winnerSeat === snap.seat
+          ? snap.you.name
+          : opponents.find((o) => o.seat === snap.result?.winnerSeat)?.name ?? "El jugador ganador";
+        const winnerScore = snap.result.scores.find((s) => s.seat === snap.result?.winnerSeat)?.score;
+        const reasonText = snap.result.reason === "retirada"
+          ? "por retirada: nadie fue, ganó sin mostrar cartas"
+          : snap.result.tie
+            ? "por empate de puntos; gana por mano" + (winnerScore !== undefined ? " (" + winnerScore + " puntos)" : "")
+            : "por puntos" + (winnerScore !== undefined ? " (" + winnerScore + " puntos)" : "");
+        return "🏆 Ganó " + winnerName + " " + reasonText + ".";
+      })()
     : "";
 
   return (
