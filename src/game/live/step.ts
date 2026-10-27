@@ -33,7 +33,7 @@ export type LiveRow = {
 };
 
 const BOT_MS = 1100;
-const REVEAL_MS = 2800;
+const REVEAL_MS = 4000;
 const AFK_MS = 50000;
 
 export type Cashout = { userId: string; amount: number; ref: string };
