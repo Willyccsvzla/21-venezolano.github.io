@@ -162,7 +162,7 @@ export function MesaLive({ profile, onLeave, onBalance }: {
         const reasonText = snap.result.reason === "retirada"
           ? "por retirada: nadie fue, ganó sin mostrar cartas"
           : snap.result.tie
-            ? "por empate de puntos; gana por mano" + (winnerScore !== undefined ? " (" + winnerScore + " puntos)" : "")
+            ? "por igualdad de puntos: gana la mano asignada" + (winnerScore !== undefined ? " (" + winnerScore + " puntos)" : "")
             : "por puntos" + (winnerScore !== undefined ? " (" + winnerScore + " puntos)" : "");
         return "🏆 Ganó " + winnerName + " " + reasonText + ".";
       })()
