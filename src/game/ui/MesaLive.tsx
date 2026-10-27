@@ -191,9 +191,9 @@ export function MesaLive({ profile, onLeave, onBalance }: {
       {landscape && <div className="opps-side right">{opponents.slice(Math.ceil(opponents.length / 2)).map(oppEl)}</div>}
 
       <div className="hand-zone">
-        <div className="scoreboard" aria-live="polite">
-          <span>Puntos</span>
-          <b>{points ?? "—"}</b>
+        <div className="scoreboard" aria-live="polite" data-testid="pozo-principal">
+          <span>Pozo</span>
+          <b>{snap.pot}</b>
         </div>
         <div className="fan" style={{ ["--n" as string]: Math.max(myCards.length, 2) }} data-testid="my-cards">
           {(myCards.length ? myCards : [null, null]).map((c, i) => (
