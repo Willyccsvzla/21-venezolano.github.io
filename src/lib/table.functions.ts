@@ -391,7 +391,7 @@ export const play = createServerFn({ method: "POST" })
       ...mine.row,
       hand,
       seats,
-      actAt: Date.now() + (hand.phase === "terminada" ? 2800 : 1100),
+      actAt: Date.now() + (hand.phase === "terminada" ? 4000 : 1100),
     };
     const ok = await save(next, mine.version);
     if (!ok) throw new Error("Alguien se adelantó. Intenta otra vez");
