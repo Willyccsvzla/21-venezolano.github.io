@@ -191,7 +191,7 @@ input { font: inherit; }
 .scoreboard span { font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; }
 .scoreboard b { font-family: "Fraunces", Georgia, serif; font-size: clamp(2rem, 7dvh, 3.2rem); color: var(--gold); line-height: .9; }
 .invite-link { width: 100%; border: 0; border-radius: 10px; padding: 10px; background: var(--cream); color: var(--ink); font-size: .85rem; }
-.me-chip { position: absolute; top: 6px; right: 6px; z-index: 20; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 6px; align-items: center; background: #000b; border: 1px solid var(--gold2); border-radius: 14px; padding: 3px 9px; font-size: .8rem; }
+.me-chip { position: absolute; top: 88px; right: 6px; z-index: 20; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 6px; align-items: center; background: #000b; border: 1px solid var(--gold2); border-radius: 14px; padding: 3px 9px; font-size: .8rem; }
 .me-chip .av-sm { grid-row: span 2; font-size: 1.6rem; }
 .me-chip .sub { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
 .me-chip.turn { box-shadow: 0 0 0 2px var(--gold), 0 0 14px var(--gold); }
