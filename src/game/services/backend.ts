@@ -11,6 +11,9 @@ export interface Profile {
   id: string;
   nick: string;
   avatar: string;
+  frame: string;
+  cardBack: string;
+  adsRemoved: boolean;
   testMode: boolean;
   createdAt: number;
 }
@@ -33,6 +36,7 @@ export interface Room {
   seats: number;
   bots: { name: string; avatar: string; profile: 'conservador' | 'equilibrado' | 'agresivo' }[];
   private: boolean;
+  category: 'public' | 'professional' | 'vip' | 'private';
   code?: string;
   /** Jugadores "conectados" simulados (solo decorativo en v1). */
   occupied: number;

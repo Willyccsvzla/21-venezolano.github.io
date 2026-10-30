@@ -140,11 +140,12 @@ export function MesaLive({ profile, onLeave, onBalance }: {
     <div key={p.seat} className={`opp${p.isBot ? "" : " human"}${snap.turnSeat === p.seat ? " turn" : ""}${p.folded || p.sittingOut ? " out" : ""}${snap.result?.winnerSeat === p.seat ? " win" : ""}`}>
       <div className="opp-av">
         {p.avatar}
+        {snap.result?.winnerSeat === p.seat && p.winEffect === "win" && <span className="win-effect" aria-label="Efecto WIN">WIN!</span>}
         {snap.mano === p.seat && <span className="mano-badge">M</span>}
         {p.revealed && p.revealed.length > 0 ? (
           <span className="opp-cards show">{p.revealed.map((c) => <SpanishCard key={c.id} card={c} className="mini-face" />)}</span>
         ) : !p.folded && !p.sittingOut && p.cardCount > 0 && (
-          <span className="opp-cards">{Array.from({ length: p.cardCount }, (_, i) => <CardBack key={i} className="mini-back" />)}</span>
+          <span className="opp-cards">{Array.from({ length: p.cardCount }, (_, i) => <CardBack key={i} className="mini-back" design={p.cardBack} />)}</span>
         )}
       </div>
       <div className="opp-name">{p.name}{p.isBot ? "" : " · amigo"}</div>
@@ -198,12 +199,13 @@ export function MesaLive({ profile, onLeave, onBalance }: {
         <div className="fan" style={{ ["--n" as string]: Math.max(myCards.length, 2) }} data-testid="my-cards">
           {(myCards.length ? myCards : [null, null]).map((c, i) => (
             <div key={c?.id ?? `back-${i}`} className={`my-card${snap.you.folded ? " folded" : ""}${iWon ? " won" : ""}`} style={{ ["--i" as string]: i }}>
-              {c ? <SpanishCard card={c} className="card-svg" /> : <CardBack className="card-svg" />}
+              {c ? <SpanishCard card={c} className="card-svg" /> : <CardBack className="card-svg" design={snap.cardBack ?? profile.cardBack} />}
             </div>
           ))}
         </div>
         <div className={`me-chip${waitingTurn ? " turn" : ""}`}>
-          <span className="av-sm">{profile.avatar}</span>
+          <span className={`av-sm frame-${profile.frame}`}>{profile.avatar}</span>
+          {iWon && snap.you.winEffect === "win" && <span className="win-effect self-win" aria-label="Efecto WIN">WIN!</span>}
           <span className="pts"><b>{points ?? "—"}</b> pts</span>
           <span className="sub">{snap.mano === snap.seat && <span className="mano-badge inline">MANO</span>}<span className="cr">🪙 {snap.you.credits}{snap.you.contributed ? ` · ${snap.you.contributed}` : ""}</span></span>
         </div>

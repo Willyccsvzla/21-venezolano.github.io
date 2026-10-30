@@ -8,8 +8,12 @@ export type LedgerKind = "entrada_mesa" | "salida_mesa";
 export type PlayerProfile = {
   nick: string;
   avatar: string;
+  frame: string;
+  cardBack: string;
   testMode: boolean;
   balance: number;
+  premiumBalance: number;
+  adsRemoved: boolean;
 };
 
 const KINDS: LedgerKind[] = ["entrada_mesa", "salida_mesa"];
@@ -53,16 +57,36 @@ export const getPlayer = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<PlayerProfile | null> => {
     const sql = await getSql();
-    const rows = await sql<{ nick: string; avatar: string; test_mode: boolean }>`
-      select nick, avatar, test_mode from players where user_id = ${context.userId}
+    const rows = await sql<{ nick: string; avatar: string; profile_frame: string; card_back: string; test_mode: boolean }>`
+      select nick, avatar, profile_frame, card_back, test_mode from players where user_id = ${context.userId}
     `;
     const row = rows[0];
     if (!row) return null;
+    const premium = await sql<{ balance: number }>`
+      select balance from premium_wallets where user_id = ${context.userId}
+    `;
+    const rank = await sql<{ rank: number }>`
+      with totals as (
+        select user_id, max(nick) as nick, count(*) filter (where won)::int as wins, coalesce(sum(payout), 0)::int as chips_won, max(recorded_at) as last_at
+        from game_results group by user_id
+      ), ranked as (
+        select user_id, row_number() over (order by wins desc, chips_won desc, last_at asc, nick asc)::int as rank from totals
+      ) select rank from ranked where user_id = ${context.userId}
+    `;
+    const removeAds = await sql<{ found: boolean }>`
+      select exists(select 1 from store_receipts where user_id = ${context.userId} and product_id = 'remove_ads') as found
+    `;
+    const cardBack = row.card_back === "all-black" && Number(rank[0]?.rank) !== 1 ? "classic" : row.card_back ?? "classic";
+    if (cardBack !== row.card_back) await sql`update players set card_back = 'classic' where user_id = ${context.userId}`;
     return {
       nick: row.nick,
       avatar: row.avatar,
+      frame: row.profile_frame ?? "none",
+      cardBack,
       testMode: Boolean(row.test_mode),
       balance: await balanceOf(context.userId),
+      premiumBalance: num(premium[0]?.balance),
+      adsRemoved: Boolean(removeAds[0]?.found),
     };
   });
 
@@ -90,11 +114,21 @@ export const savePlayer = createServerFn({ method: "POST" })
       select ${id}, ${userId}, 'bono_inicial', ${BONO_INICIAL}, ${BONO_INICIAL}, 'alta'
       where not exists (select 1 from ledger where user_id = ${userId})
     `;
+    const state = await sql<{ profile_frame: string; card_back: string; premium_balance: number; ads_removed: boolean }>`
+      select p.profile_frame, p.card_back,
+        coalesce((select w.balance from premium_wallets w where w.user_id = p.user_id), 0) as premium_balance,
+        exists(select 1 from store_receipts r where r.user_id = p.user_id and r.product_id = 'remove_ads') as ads_removed
+      from players p where p.user_id = ${userId}
+    `;
     return {
       nick: data.nick,
       avatar: data.avatar,
+      frame: state[0]?.profile_frame ?? "none",
+      cardBack: state[0]?.card_back ?? "classic",
       testMode: data.testMode,
       balance: await balanceOf(userId),
+      premiumBalance: num(state[0]?.premium_balance),
+      adsRemoved: Boolean(state[0]?.ads_removed),
     };
   });
 

@@ -8,6 +8,7 @@ import type { Card } from "../engine";
 import { cardName } from "../engine";
 
 const files = import.meta.glob('../assets/cards/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const backFiles = import.meta.glob('../assets/card-backs/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const url = (k: string) => files[`../assets/cards/${k}.webp`];
 
 export const CARD_RATIO = 440 / 695;
@@ -19,6 +20,8 @@ export function SpanishCard({ card, className, style }: { card: Card; className?
   );
 }
 
-export function CardBack({ className, style }: { className?: string; style?: CSSProperties }) {
-  return <img className={`naipe ${className ?? ''}`} style={style} src={url('back')} alt="" aria-hidden draggable={false} />;
+export function CardBack({ className, style, design = "classic" }: { className?: string; style?: CSSProperties; design?: string }) {
+  const variant = ["silver", "gold", "all-black"].includes(design) ? `back-${design}` : "";
+  const customBack = variant ? backFiles[`../assets/card-backs/${design}.webp`] : undefined;
+  return <img className={`naipe ${variant} ${className ?? ''}`} style={style} src={customBack ?? url('back')} alt="" aria-hidden draggable={false} />;
 }

@@ -66,7 +66,7 @@ export function SignInGate({
 export function SignInButtons() {
   return (
     <div className="flex w-full max-w-sm flex-col gap-2">
-      {GROK_PROVIDERS.map((p) => (
+      {GOOGLE_PROVIDERS.map((p) => (
         <button
           key={p.providerId}
           type="button"

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   applyAction, decideBot, minStackToPlay, DEFAULT_RULES, handScore, legalActions, nextTable, publicView, Rng, startHand,
   type Action, type HandState, type PlayerState, type RuleConfig, type TableState,
@@ -99,6 +99,16 @@ export function Mesa({ room, profile, buyIn, seed, userId, onLeave, onRebuy }: {
     }
   }
   const dealing = !!hand && (shuffling || nextDealSeat >= 0);
+  const say = useCallback((seat: number, text: string) => {
+    const name = hand?.players[seat]?.name ?? table.players[seat]?.name ?? '?';
+    setChat((c) => [...c.slice(-40), { id: ++chatId.current, seat, name, text }]);
+    if (seat !== 0) {
+      setBubbles((b) => ({ ...b, [seat]: text }));
+      setTimeout(() => setBubbles((b) => { const x = { ...b }; if (x[seat] === text) delete x[seat]; return x; }), 2600);
+      setUnread((u) => u + 1);
+    }
+  }, [hand, table.players]);
+
   useEffect(() => {
     if (nextDealSeat < 0) return;
     const id = setTimeout(() => {
@@ -125,17 +135,7 @@ export function Mesa({ room, profile, buyIn, seed, userId, onLeave, onRebuy }: {
       if (talkRng.current.next() < chance) say(seat, line(kind, () => talkRng.current.next()));
     }, BOT_DELAY);
     return () => clearTimeout(id);
-  }, [hand, dealing]);
-
-  function say(seat: number, text: string) {
-    const name = hand?.players[seat]?.name ?? table.players[seat]?.name ?? '?';
-    setChat((c) => [...c.slice(-40), { id: ++chatId.current, seat, name, text }]);
-    if (seat !== 0) {
-      setBubbles((b) => ({ ...b, [seat]: text }));
-      setTimeout(() => setBubbles((b) => { const x = { ...b }; if (x[seat] === text) delete x[seat]; return x; }), 2600);
-      setUnread((u) => u + 1);
-    }
-  }
+  }, [hand, dealing, say]);
   function botReply(kind: TalkKind, prob: number) {
     if (!hand) return;
     const bots = hand.players.filter((p) => p.isBot && !p.folded && !p.sittingOut);

@@ -18,6 +18,7 @@ type RoomCard = {
   occupied: number;
   humans: number;
   private: boolean;
+  category: "public" | "professional" | "vip" | "private";
   code?: string;
   bots: { name: string; avatar: string; profile: "agresivo" }[];
 };
@@ -36,7 +37,7 @@ function parse<T>(v: unknown, fallback: T): T {
 }
 
 type DbRow = {
-  id: string; name: string; casa: number; entrada: number; code: string | null; private: boolean;
+  id: string; name: string; casa: number; entrada: number; code: string | null; private: boolean; category: string;
   seats: unknown; table_state: unknown; hand: unknown; queue: unknown; version: number; act_at: number;
 };
 
@@ -48,6 +49,7 @@ function toLive(r: DbRow): LiveRow {
     entrada: num(r.entrada),
     code: r.code,
     private: Boolean(r.private),
+    category: r.category === "professional" || r.category === "vip" || r.category === "private" ? r.category : "public",
     seats: parse<LiveSeat[]>(r.seats, []),
     table: parse<TableState>(r.table_state, { players: [], nextMano: 0, handNumber: 1, carry: null, seed: 1 }),
     hand: r.hand ? parse<HandState | null>(r.hand, null) : null,
@@ -160,8 +162,8 @@ async function ensure(id: string): Promise<{ row: LiveRow; version: number }> {
   const sql = await getSql();
   const fresh = openTable(spec, spec.id.split("").reduce((a, c) => (a * 33 + c.charCodeAt(0)) >>> 0, 7));
   await sql`
-    insert into live_tables (id, name, casa, entrada, seats_n, code, private, seats, table_state, hand, queue, version, act_at)
-    values (${fresh.id}, ${fresh.name}, ${fresh.casa}, ${fresh.entrada}, ${fresh.seats.length}, ${null}, ${false},
+    insert into live_tables (id, name, casa, entrada, seats_n, code, private, category, seats, table_state, hand, queue, version, act_at)
+    values (${fresh.id}, ${fresh.name}, ${fresh.casa}, ${fresh.entrada}, ${fresh.seats.length}, ${null}, ${false}, ${fresh.category},
       ${JSON.stringify(fresh.seats)}, ${JSON.stringify(fresh.table)}, ${null}, ${"[]"}, ${1}, ${0})
     on conflict (id) do nothing
   `;
@@ -175,6 +177,29 @@ async function commit(row: LiveRow, version: number, now: number): Promise<{ row
   let ver = version;
   for (let i = 0; i < 5; i++) {
     const before = JSON.stringify(current);
+    if (current.hand?.phase === "terminada" && current.hand.result && now >= current.actAt) {
+      const sql = await getSql();
+      const result = current.hand.result;
+      for (let seat = 0; seat < current.seats.length; seat++) {
+        const player = current.seats[seat];
+        if (!player.userId) continue;
+        await sql`
+          insert into game_results (table_id, hand_number, user_id, nick, won, payout)
+          values (${current.id}, ${current.hand.handNumber}, ${player.userId}, ${player.name}, ${seat === result.winnerSeat}, ${num(result.payouts[seat] ?? 0)})
+          on conflict (table_id, hand_number, user_id) do nothing
+        `;
+      }
+      await sql`
+        with totals as (
+          select user_id, max(nick) as nick, count(*) filter (where won)::int as wins, coalesce(sum(payout), 0)::int as chips_won, max(recorded_at) as last_at
+          from game_results group by user_id
+        ), first_place as (
+          select user_id from totals order by wins desc, chips_won desc, last_at asc, nick asc limit 1
+        )
+        update players set card_back = 'classic'
+        where card_back = 'all-black' and user_id not in (select user_id from first_place)
+      `;
+    }
     const stepped = pump(current, now);
     for (const c of stepped.cashouts) {
       if (c.amount > 0) await cash(c.userId, c.amount, c.ref);
@@ -205,10 +230,66 @@ async function chats(tableId: string, userId: string) {
   return rows.reverse().map((m) => ({ id: m.id, name: m.name, text: m.body, mine: m.user_id === userId }));
 }
 
-async function pack(row: LiveRow, userId: string, version: number): Promise<Snap & { balance: number; version: number; chat: { id: string; name: string; text: string; mine: boolean }[] }> {
+async function pack(row: LiveRow, userId: string, version: number): Promise<Snap & { balance: number; version: number; cardBack: string; chat: { id: string; name: string; text: string; mine: boolean }[] }> {
   const snap = snapOf(row, userId);
   if (!snap) throw new Error("No estás en esta mesa");
-  return { ...snap, balance: await balanceOf(userId), version, chat: await chats(row.id, userId) };
+  const sql = await getSql();
+  const opponentIds = row.seats
+    .filter((seat) => seat.userId && seat.userId !== userId)
+    .map((seat) => seat.userId!);
+  const participantIds = [...new Set([userId, ...opponentIds])];
+  const winEffects = participantIds.length
+    ? await sql<{ user_id: string; item_id: string }>`
+      select user_id, item_id from player_inventory
+      where user_id = any(${participantIds}) and equipped = true and item_id like 'effect-%'
+    `
+    : [];
+  const effectByUserId = new Map(winEffects.map((item) => [item.user_id, item.item_id.slice("effect-".length)]));
+  const opponentBacks = opponentIds.length
+    ? await sql<{ user_id: string; card_back: string }>`
+      with totals as (
+        select user_id, max(nick) as nick, count(*) filter (where won)::int as wins,
+          coalesce(sum(payout), 0)::int as chips_won, max(recorded_at) as last_at
+        from game_results group by user_id
+      ), ranked as (
+        select user_id, row_number() over (
+          order by wins desc, chips_won desc, last_at asc, nick asc
+        )::int as rank from totals
+      )
+      select p.user_id,
+        case when p.card_back = 'all-black' and coalesce(r.rank, 0) <> 1
+          then 'classic' else p.card_back end as card_back
+      from players p left join ranked r on r.user_id = p.user_id
+      where p.user_id = any(${opponentIds})
+    `
+    : [];
+  const backsByUserId = new Map(opponentBacks.map((entry) => [entry.user_id, entry.card_back]));
+  const stored = await sql<{ card_back: string }>`select card_back from players where user_id = ${userId}`;
+  let cardBack = stored[0]?.card_back ?? "classic";
+  if (cardBack === "all-black") {
+    const ranking = await sql<{ rank: number }>`
+      with totals as (
+        select user_id, max(nick) as nick, count(*) filter (where won)::int as wins, coalesce(sum(payout), 0)::int as chips_won, max(recorded_at) as last_at
+        from game_results group by user_id
+      ), ranked as (
+        select user_id, row_number() over (order by wins desc, chips_won desc, last_at asc, nick asc)::int as rank from totals
+      ) select rank from ranked where user_id = ${userId}
+    `;
+    if (Number(ranking[0]?.rank) !== 1) {
+      cardBack = "classic";
+      await sql`update players set card_back = 'classic' where user_id = ${userId}`;
+    }
+  }
+  return {
+    ...snap,
+    opponents: snap.opponents.map((opponent) => ({
+      ...opponent,
+      cardBack: backsByUserId.get(row.seats[opponent.seat]?.userId ?? "") ?? "classic",
+      winEffect: effectByUserId.get(row.seats[opponent.seat]?.userId ?? "") ?? null,
+    })),
+    you: { ...snap.you, winEffect: effectByUserId.get(userId) ?? null },
+    balance: await balanceOf(userId), version, cardBack, chat: await chats(row.id, userId),
+  };
 }
 
 export const listTables = createServerFn({ method: "GET" })
@@ -223,7 +304,7 @@ export const listTables = createServerFn({ method: "GET" })
       const seats = live ? parse<LiveSeat[]>(live.seats, []) : [];
       const queue = live ? parse<QueueItem[]>(live.queue, []) : [];
       const humans = seats.filter((s) => s.userId).length + queue.length;
-      const shown = seats.length ? seats : Array.from({ length: spec.seats }, (_, i) => ({ name: "Bot", avatar: "🃏", isBot: true }));
+      const shown = seats.length ? seats : Array.from({ length: spec.seats }, () => ({ name: "Bot", avatar: "🃏", isBot: true }));
       return {
         id: spec.id,
         name: spec.name,
@@ -233,6 +314,7 @@ export const listTables = createServerFn({ method: "GET" })
         occupied: humans,
         humans,
         private: false,
+        category: spec.category,
         bots: shown.map((s) => ({ name: s.name, avatar: s.avatar, profile: "agresivo" as const })),
       };
     });
@@ -345,7 +427,7 @@ export const createTable = createServerFn({ method: "POST" })
     const code = Array.from({ length: 5 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
     const id = `p-${code}`;
     const entrada = data.casa * 30;
-    const spec = { id, name: data.name, casa: data.casa, entrada, seats: data.bots + 1 };
+    const spec = { id, name: data.name, casa: data.casa, entrada, seats: data.bots + 1, category: "private" as const };
     let row = openTable(spec, Date.now() % 1_000_000_000);
     row.code = code;
     row.private = true;
@@ -355,8 +437,8 @@ export const createTable = createServerFn({ method: "POST" })
     row = takeSeat(row, { userId: context.userId, nick: me.nick, avatar: me.avatar, ref }, Date.now());
     const sql = await getSql();
     await sql`
-      insert into live_tables (id, name, casa, entrada, seats_n, code, private, seats, table_state, hand, queue, version, act_at)
-      values (${row.id}, ${row.name}, ${row.casa}, ${row.entrada}, ${row.seats.length}, ${code}, ${true},
+      insert into live_tables (id, name, casa, entrada, seats_n, code, private, category, seats, table_state, hand, queue, version, act_at)
+      values (${row.id}, ${row.name}, ${row.casa}, ${row.entrada}, ${row.seats.length}, ${code}, ${true}, ${"private"},
         ${JSON.stringify(row.seats)}, ${JSON.stringify(row.table)}, ${null}, ${JSON.stringify(row.queue)}, ${1}, ${0})
     `;
     const done = await commit(row, 1, Date.now());

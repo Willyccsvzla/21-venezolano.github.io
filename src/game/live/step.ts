@@ -25,6 +25,7 @@ export type LiveRow = {
   entrada: number;
   code: string | null;
   private: boolean;
+  category: "public" | "professional" | "vip" | "private";
   seats: LiveSeat[];
   table: TableState;
   hand: HandState | null;
@@ -56,6 +57,7 @@ export function openTable(spec: PublicRoom, seed: number): LiveRow {
     entrada: spec.entrada,
     code: null,
     private: false,
+    category: spec.category,
     seats,
     table: { players: seats.map(seatPlayer), nextMano: 0, handNumber: 1, carry: null, seed },
     hand: null,
@@ -149,7 +151,7 @@ function settle(row: LiveRow, now: number): { row: LiveRow; cashouts: Cashout[] 
     const bot = { ...botAt(row.id, i + hand.handNumber * 10, seats.filter((_, n) => n !== i).map((s) => s.name)), credits: botStack(row.casa) };
     return bot;
   });
-  let queue = [...row.queue];
+  const queue = [...row.queue];
   while (queue.length) {
     const idx = seats.findIndex((s) => s.isBot);
     if (idx < 0) break;
@@ -180,8 +182,8 @@ function settle(row: LiveRow, now: number): { row: LiveRow; cashouts: Cashout[] 
 }
 
 function seatWaiting(row: LiveRow, now: number): LiveRow {
-  let seats = row.seats.map((s) => ({ ...s }));
-  let queue = [...row.queue];
+  const seats = row.seats.map((s) => ({ ...s }));
+  const queue = [...row.queue];
   while (queue.length) {
     const idx = seats.findIndex((s) => s.isBot);
     if (idx < 0) break;
@@ -253,10 +255,12 @@ export type Snap = {
   handNumber: number;
   mano: number;
   turnSeat: number;
-  you: { name: string; avatar: string; credits: number; contributed: number; folded: boolean; cards: PublicView["myCards"] };
+  you: { name: string; avatar: string; credits: number; contributed: number; folded: boolean; cards: PublicView["myCards"]; winEffect: string | null };
   opponents: {
     seat: number; name: string; avatar: string; isBot: boolean; credits: number; contributed: number;
     folded: boolean; sittingOut: boolean; lastAction?: string; cardCount: number; revealed: PublicView["myCards"];
+    cardBack: string;
+    winEffect: string | null;
   }[];
   legal: PublicView["legal"] | null;
   result: HandState["result"];
@@ -295,6 +299,7 @@ export function snapOf(row: LiveRow, userId: string): Snap | null {
       contributed: hand && seat >= 0 ? hand.players[seat].contributed : 0,
       folded: hand && seat >= 0 ? hand.players[seat].folded : false,
       cards: view?.myCards ?? [],
+      winEffect: null,
     },
     opponents: opponents.map(({ s, i }) => {
       const hp = hand?.players[i];
@@ -311,6 +316,8 @@ export function snapOf(row: LiveRow, userId: string): Snap | null {
         lastAction: hp?.lastAction,
         cardCount: cards.length,
         revealed: view?.revealed?.[i] ?? [],
+        cardBack: "classic",
+        winEffect: null,
       };
     }),
     legal: view && view.legal.isTurn ? view.legal : view ? { ...view.legal, isTurn: false } : null,

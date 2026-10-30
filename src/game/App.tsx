@@ -1,21 +1,25 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createDeck } from "./engine";
 import { SpanishCard } from "./ui/SpanishCard";
 import type { Profile, Room } from "./services/backend";
 import { Entrada } from "./ui/Entrada";
 import { Lobby } from "./ui/Lobby";
 import { MesaLive } from "./ui/MesaLive";
-import { Tienda } from "./ui/Tienda";
 import { getPlayer, savePlayer, type PlayerProfile } from "@/lib/player.functions";
 import { createTable, joinTable, leaveLive, listTables, whereAmI } from "@/lib/table.functions";
+import { getLeaderboard } from "@/lib/leaderboard.functions";
+import { createRewardedAdTicket } from "@/lib/ad-rewards.functions";
+import { verifyPlayPurchase } from "@/lib/play-store.functions";
+import { equipCosmetic, getProgression, grantDevTestCredits, purchaseCosmetic } from "@/lib/progression.functions";
+import { startPlayPurchase, startRewardedAd } from "./ui/native-commerce";
 import { unlockAudio, playShuffle } from "./ui/sound";
 import { readInvite, rememberInvite } from "./ui/invite";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 
-type Screen = "entrada" | "tienda" | "lobby" | "mesa";
+type Screen = "entrada" | "lobby" | "mesa";
 
 function profileOf(userId: string, p: PlayerProfile): Profile {
-  return { id: userId, nick: p.nick, avatar: p.avatar, testMode: p.testMode, createdAt: 0 };
+  return { id: userId, nick: p.nick, avatar: p.avatar, frame: p.frame, cardBack: p.cardBack, adsRemoved: p.adsRemoved, testMode: p.testMode, createdAt: 0 };
 }
 
 export default function App() {
@@ -28,6 +32,28 @@ export default function App() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [notice, setNotice] = useState("");
   const [reload, setReload] = useState(0);
+  const loadLeaderboard = useCallback(() => getLeaderboard(), []);
+  const loadMarket = useCallback(() => getProgression(), []);
+  const refreshPlayer = useCallback(async () => {
+    const current = await getPlayer();
+    if (!current) return;
+    setPlayer(current);
+    setBalance(current.balance);
+  }, []);
+  const buyStoreProduct = useCallback(async (productId: string) => {
+    const purchase = await startPlayPurchase(productId, userId);
+    const result = await verifyPlayPurchase({ data: purchase });
+    await refreshPlayer();
+    return result;
+  }, [refreshPlayer, userId]);
+  const watchRewardedAd = useCallback(async () => {
+    const ticket = await createRewardedAdTicket();
+    const completed = await startRewardedAd({ adUnitId: ticket.adUnitId, userId: ticket.userId, customData: ticket.ticket, rewardItem: ticket.rewardItem, rewardAmount: ticket.rewardAmount });
+    if (!completed) return false;
+    // SSV is asynchronous; refresh after the callback has had time to arrive.
+    window.setTimeout(() => { void refreshPlayer(); }, 2500);
+    return true;
+  }, [refreshPlayer]);
 
   useEffect(() => {
     if (!userId) return;
@@ -129,13 +155,6 @@ export default function App() {
     }
   }
 
-  if (screen === "tienda") {
-    return (
-      <Tienda balance={balance}
-        onContinue={() => setScreen("lobby")}
-        onBack={() => setScreen("lobby")} />
-    );
-  }
   if (screen === "mesa") {
     return (
       <MesaLive profile={profile} onBalance={setBalance}
@@ -144,13 +163,26 @@ export default function App() {
   }
   return (
     <Lobby profile={profile} balance={balance} rooms={rooms} notice={notice}
+      onLoadLeaderboard={loadLeaderboard} onLoadMarket={loadMarket}
+      onBuyCosmetic={async (itemId) => { await purchaseCosmetic({ data: { itemId, requestId: crypto.randomUUID() } }); }}
+      onEquipCosmetic={async (itemId) => { await equipCosmetic({ data: { itemId } }); await refreshPlayer(); }}
+      onGrantDevPremium={async () => {
+        const premiumBalance = await grantDevTestCredits({ data: { requestId: crypto.randomUUID() } });
+        await refreshPlayer();
+        return premiumBalance;
+      }}
+      onBuyStoreProduct={buyStoreProduct} onWatchRewardedAd={watchRewardedAd}
       onJoin={(r) => { void enter(r); }}
       onCreate={async (n, c, b) => {
         const s = await createTable({ data: { name: n, casa: c, bots: b } });
         setBalance(s.balance);
-        return { id: s.tableId, name: s.name, casa: s.casa, entrada: s.entrada, seats: 4, bots: [], private: true, code: s.code ?? "", occupied: s.humans };
+        return { id: s.tableId, name: s.name, casa: s.casa, entrada: s.entrada, seats: 4, bots: [], private: true, category: "private", code: s.code ?? "", occupied: s.humans };
       }}
-      onFindCode={async (code) => ({ id: "", name: "Mesa", casa: 1, entrada: 0, seats: 2, bots: [], private: true, code: code.trim().toUpperCase(), occupied: 0 })}
-      onShop={() => setScreen("tienda")} />
+      onFindCode={async (code) => ({ id: "", name: "Mesa", casa: 1, entrada: 0, seats: 2, bots: [], private: true, category: "private", code: code.trim().toUpperCase(), occupied: 0 })}
+      onSaveProfile={async (nick, avatar) => {
+        const saved = await savePlayer({ data: { nick, avatar, testMode: player.testMode } });
+        setPlayer(saved);
+        setBalance(saved.balance);
+      }} />
   );
 }
