@@ -13,7 +13,15 @@ const url = (k: string) => files[`../assets/cards/${k}.webp`];
 
 export const CARD_RATIO = 440 / 695;
 
-export function SpanishCard({ card, className, style }: { card: Card; className?: string; style?: CSSProperties }) {
+/** Skin de cara premium: misma imagen del naipe (figuras/palos/valores intactos) sobre fondo metálico. */
+export function SpanishCard({ card, className, style, skin }: { card: Card; className?: string; style?: CSSProperties; skin?: string | null }) {
+  if (skin && ["oro", "plata", "allblack"].includes(skin)) {
+    return (
+      <span className={`naipe skin skin-${skin} ${className ?? ''}`} style={style} data-card={card.id} role="img" aria-label={cardName(card)}>
+        <img src={url(`${card.rank}-${card.suit}`)} alt="" draggable={false} decoding="async" />
+      </span>
+    );
+  }
   return (
     <img className={`naipe ${className ?? ''}`} style={style} src={url(`${card.rank}-${card.suit}`)} alt={cardName(card)}
       data-card={card.id} draggable={false} decoding="async" />

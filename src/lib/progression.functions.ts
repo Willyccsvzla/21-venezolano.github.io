@@ -7,9 +7,13 @@ import { gateIdentityEnabled } from "@/lib/auth/gate-identity.server";
 const CATALOG = [
   { id: "back-silver", name: "Reverso Plata", kind: "back", price: 100, maxLevel: 3 },
   { id: "back-gold", name: "Reverso Oro", kind: "back", price: 250, maxLevel: 3 },
+  { id: "frame-basic", name: "Marco Esmeralda", kind: "frame", price: 60, maxLevel: 1 },
   { id: "frame-silver", name: "Marco Plata", kind: "frame", price: 150, maxLevel: 1 },
   { id: "frame-gold", name: "Marco Oro", kind: "frame", price: 350, maxLevel: 1 },
+  { id: "deck-plata", name: "Mazo Plata", kind: "deck", price: 200, maxLevel: 1 },
+  { id: "deck-oro", name: "Mazo Oro", kind: "deck", price: 450, maxLevel: 1 },
   { id: "effect-win", name: "Efecto WIN", kind: "effect", price: 300, maxLevel: 1 },
+  { id: "effect-win-gold", name: "Efecto WIN Oro", kind: "effect", price: 700, maxLevel: 1 },
 ] as const;
 
 export const grantDevTestCredits = createServerFn({ method: "POST" })
@@ -44,7 +48,7 @@ export const grantDevTestCredits = createServerFn({ method: "POST" })
 export type MarketItem = {
   id: string;
   name: string;
-  kind: "back" | "frame" | "effect";
+  kind: "back" | "frame" | "effect" | "deck";
   price: number;
   maxLevel: number;
   level: number;
@@ -54,6 +58,7 @@ export type ProgressionState = {
   premiumBalance: number;
   currentFrame: string;
   currentBack: string;
+  currentDeck: string | null;
   currentEffect: string | null;
   rank: number | null;
   items: MarketItem[];
@@ -82,17 +87,21 @@ export const getProgression = createServerFn({ method: "GET" })
     const wallet = await sql<{ balance: number }>`select balance from premium_wallets where user_id = ${context.userId}`;
     const frame = await sql<{ profile_frame: string; card_back: string }>`select profile_frame, card_back from players where user_id = ${context.userId}`;
     const equipped = await sql<{ item_id: string }>`select item_id from player_inventory where user_id = ${context.userId} and equipped = true and item_id like 'effect-%' limit 1`;
+    const deckRow = await sql<{ item_id: string }>`select item_id from player_inventory where user_id = ${context.userId} and equipped = true and item_id like 'deck-%' limit 1`;
     const owned = new Map(rows.map((row) => [row.item_id, Number(row.level)]));
     const rank = await rankFor(context.userId);
     return {
       premiumBalance: Number(wallet[0]?.balance ?? 0),
-      currentFrame: frame[0]?.profile_frame ?? "none",
+      currentFrame: frame[0]?.profile_frame === "all-black" && rank !== 1 ? "none" : frame[0]?.profile_frame ?? "none",
       currentBack: frame[0]?.card_back === "all-black" && rank !== 1 ? "classic" : frame[0]?.card_back ?? "classic",
       currentEffect: equipped[0]?.item_id.slice("effect-".length) ?? null,
+      currentDeck: deckRow[0] ? (deckRow[0].item_id === "deck-allblack" && rank !== 1 ? null : deckRow[0].item_id.slice("deck-".length)) : null,
       rank,
       items: [
         ...CATALOG.map((item) => ({ ...item, level: owned.get(item.id) ?? 0, canBuy: (owned.get(item.id) ?? 0) < item.maxLevel })),
         { id: "back-all-black", name: "All Black", kind: "back" as const, price: 0, maxLevel: 1, level: rank === 1 ? 1 : 0, canBuy: false },
+        { id: "deck-allblack", name: "Mazo All Black", kind: "deck" as const, price: 0, maxLevel: 1, level: rank === 1 ? 1 : 0, canBuy: false },
+        { id: "frame-all-black", name: "Marco All Black", kind: "frame" as const, price: 0, maxLevel: 1, level: rank === 1 ? 1 : 0, canBuy: false },
       ],
     };
   });
@@ -145,7 +154,7 @@ export const equipCosmetic = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { itemId?: string }) => {
     const itemId = String(input?.itemId ?? "none");
-    if (!new Set(["none", "frame-silver", "frame-gold", "back-silver", "back-gold", "back-all-black", "effect-win"]).has(itemId)) {
+    if (!new Set(["none", "frame-basic", "frame-silver", "frame-gold", "frame-all-black", "back-silver", "back-gold", "back-all-black", "effect-win", "effect-win-gold", "deck-plata", "deck-oro", "deck-allblack", "deck-none"]).has(itemId)) {
       throw new Error("Objeto no disponible");
     }
     return { itemId };
@@ -158,6 +167,26 @@ export const equipCosmetic = createServerFn({ method: "POST" })
       if (!ownedEffect[0]) throw new Error("Primero desbloquea este efecto en el mercado");
       await sql`update player_inventory set equipped = (item_id = ${item}) where user_id = ${context.userId} and item_id like 'effect-%'`;
       return { frame: "none", effect: item.slice("effect-".length) };
+    }
+    if (item.startsWith("deck-")) {
+      if (item === "deck-none") {
+        await sql`update player_inventory set equipped = false where user_id = ${context.userId} and item_id like 'deck-%'`;
+        return { frame: "none", deck: null };
+      }
+      if (item === "deck-allblack") {
+        if (await rankFor(context.userId) !== 1) throw new Error("El mazo All Black está reservado para el primer puesto del ranking");
+        await sql`insert into player_inventory (user_id, item_id, level) values (${context.userId}, 'deck-allblack', 1) on conflict do nothing`;
+      } else {
+        const ownedDeck = await sql<{ level: number }>`select level from player_inventory where user_id = ${context.userId} and item_id = ${item}`;
+        if (!ownedDeck[0]) throw new Error("Primero desbloquea este mazo en el mercado");
+      }
+      await sql`update player_inventory set equipped = (item_id = ${item}) where user_id = ${context.userId} and item_id like 'deck-%'`;
+      return { frame: "none", deck: item.slice("deck-".length) };
+    }
+    if (item === "frame-all-black") {
+      if (await rankFor(context.userId) !== 1) throw new Error("El marco All Black está reservado para el primer puesto del ranking");
+      await sql`update players set profile_frame = 'all-black' where user_id = ${context.userId}`;
+      return { frame: "all-black" };
     }
     const owned = item === "none" || item === "back-all-black"
       ? []

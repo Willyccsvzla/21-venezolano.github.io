@@ -161,3 +161,95 @@ export function playDeal() {
   // aterrizaje
   flick(c, t + 0.1, 0.95, 0);
 }
+
+// ===== Efectos de victoria y dorsos premium (sintetizados, sin archivos) =====
+function ready(): AudioContext | null {
+  if (muted) return null;
+  const c = ac();
+  if (!c) return null;
+  if (c.state !== "running") void c.resume().catch(() => undefined);
+  return c;
+}
+
+/** Nota con envolvente (oscilador). */
+function tone(c: AudioContext, t: number, freq: number, dur: number, gain: number, type: OscillatorType = "sine", to: AudioNode = out(c), glideTo?: number) {
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(to);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+
+/** Tintineo de fichas/monedas. */
+function chips(c: AudioContext, t: number, n: number, spread: number) {
+  for (let i = 0; i < n; i++) {
+    const at = t + Math.random() * spread;
+    const to = dest(c, (Math.random() - 0.5) * 0.8);
+    const f = 2600 + Math.random() * 2400;
+    tone(c, at, f, 0.09, 0.07, "triangle", to);
+    tone(c, at, f * 1.51, 0.06, 0.035, "sine", to);
+    burst(c, at, 0.03, 5000, 1.2, 0.05, to);
+  }
+}
+
+export type WinTier = "basic" | "gold" | "black";
+
+export function playWin(tier: WinTier) {
+  const c = ready();
+  if (!c) return;
+  const t = c.currentTime + 0.03;
+  if (tier === "basic") {
+    chips(c, t, 9, 0.5);
+    tone(c, t + 0.45, 1568, 0.9, 0.16, "sine");
+    tone(c, t + 0.45, 3136, 0.6, 0.05, "sine");
+    return;
+  }
+  if (tier === "gold") {
+    // fanfarria corta: arpegio mayor ascendente en metales + acorde final
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((f, i) => {
+      tone(c, t + i * 0.13, f, 0.32, 0.11, "sawtooth");
+      tone(c, t + i * 0.13, f * 2, 0.28, 0.03, "square");
+    });
+    [523.25, 659.25, 783.99, 1046.5].forEach((f) => tone(c, t + 0.6, f, 1.3, 0.07, "sawtooth"));
+    chips(c, t + 0.5, 16, 1.2);
+    return;
+  }
+  // all-black: golpe grave (boom) + coro sintético
+  tone(c, t, 110, 1.1, 0.5, "sine", out(c), 38);
+  burst(c, t, 0.5, 180, 0.7, 0.4, out(c), 60, "lowpass");
+  const choir = [220, 277.18, 329.63, 440];
+  choir.forEach((f) => {
+    for (const d of [-6, 0, 6]) {
+      tone(c, t + 0.35, f * Math.pow(2, d / 1200), 1.8, 0.035, "sawtooth");
+    }
+  });
+  tone(c, t + 0.35, 880, 1.6, 0.03, "sine");
+}
+
+/** "Shing" metálico al voltear un dorso premium. */
+export function playShing(kind: "silver" | "gold" | "all-black" = "silver") {
+  const c = ready();
+  if (!c) return;
+  const t = c.currentTime + 0.01;
+  const base = kind === "gold" ? 2093 : kind === "all-black" ? 1318.5 : 2637;
+  burst(c, t, 0.35, 7000, 0.8, 0.08, out(c), 11000, "highpass");
+  tone(c, t, base, 0.7, 0.07, "sine");
+  tone(c, t, base * 2.76, 0.45, 0.035, "sine");
+  tone(c, t, base * 5.4, 0.25, 0.02, "sine");
+}
+
+/** Nivel del efecto de victoria: all-black (solo #1 del ranking) > oro > básico. */
+export function winTier(effect: string | null | undefined, cardBack?: string | null): WinTier | null {
+  if (cardBack === "all-black") return "black";
+  if (effect === "win-gold") return "gold";
+  if (effect === "win") return "basic";
+  return null;
+}
+

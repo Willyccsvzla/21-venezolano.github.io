@@ -10,6 +10,8 @@ import { CardBack, SpanishCard } from './SpanishCard';
 import { useViewport } from './useViewport';
 import { isMuted, playDeal, playShuffle, setMuted } from './sound';
 import { line, type TalkKind } from './chat';
+import { ScoreTag, WinFx } from './WinFx';
+import { Avatar } from './Avatar';
 
 const search = typeof location !== "undefined" ? location.search : "";
 const BOT_DELAY = Number(new URLSearchParams(search).get("botDelay") ?? 1300);
@@ -216,6 +218,14 @@ export function Mesa({ room, profile, buyIn, seed, userId, onLeave, onRebuy }: {
   const left = landscape ? opps.slice(0, Math.ceil(opps.length / 2)).reverse() : [];
   const right = landscape ? opps.slice(Math.ceil(opps.length / 2)) : [];
 
+  const winScore = result?.reason === 'puntuacion' ? result.scores.find((x) => x.seat === result.winnerSeat)?.score : undefined;
+  const scoreFor = (seat: number) => {
+    if (result?.reason !== 'puntuacion') return null;
+    const sc = result.scores.find((x) => x.seat === seat);
+    if (!sc) return null;
+    return <ScoreTag score={sc.score} bust={sc.bust} winner={result.winnerSeat === seat} diff={winScore !== undefined ? winScore - sc.score : undefined} />;
+  };
+
   const oppEl = (p: (typeof opps)[number]) => {
     const isTurn = turnSeat === p.seat;
     const isMano = hand?.mano === p.seat;
@@ -228,7 +238,7 @@ export function Mesa({ room, profile, buyIn, seed, userId, onLeave, onRebuy }: {
           {p.avatar}
           {isMano && <span className="mano-badge">M</span>}
           {revealed && revealed.length > 0 ? (
-            <span className="opp-cards show">{revealed.map((c) => <SpanishCard key={c.id} card={c} className="mini-face" />)}</span>
+            <span className="opp-cards show">{revealed.map((c) => <SpanishCard key={c.id} card={c} className="mini-face" />)}{scoreFor(p.seat)}</span>
           ) : !p.folded && !p.sittingOut && (shown[p.seat] ?? 0) > 0 && (
             <span className="opp-cards">{Array.from({ length: shown[p.seat] ?? 0 }, (_, i) => <CardBack key={i} className="mini-back" />)}</span>
           )}
@@ -253,7 +263,7 @@ export function Mesa({ room, profile, buyIn, seed, userId, onLeave, onRebuy }: {
 
   const meChip = hand ? (
     <div className={`me-chip${turnSeat === 0 ? ' turn' : ''}`} data-testid="my-points">
-      <span className="av-sm">{profile.avatar}</span>
+      <Avatar emoji={profile.avatar} photo={profile.photo} frame={profile.frame} className="av-sm pav-chip" />
       <span className="pts"><b>{handScore(myCards)}</b> pts</span>
       <span className="sub">{hand.mano === 0 && <span className="mano-badge inline">MANO</span>}<span className="cr">🪙 {me?.credits}{me?.contributed ? ` · ${me.contributed}` : ''}</span></span>
     </div>
@@ -261,6 +271,7 @@ export function Mesa({ room, profile, buyIn, seed, userId, onLeave, onRebuy }: {
 
   return (
     <div className={`screen mesa ${landscape ? 'land' : 'port'}`}>
+      {result && iWon && profile.cardBack === 'all-black' && <WinFx key={`fx-${hand?.handNumber ?? ''}`} tier="black" name={profile.nick} avatar={profile.avatar} sound={!isMuted()} />}
       <header className="mesa-top">
         <button className="btn ghost sm" onClick={() => setConfirmLeave(true)} aria-label="Salir">✕</button>
         <div className="chips">
@@ -290,6 +301,7 @@ export function Mesa({ room, profile, buyIn, seed, userId, onLeave, onRebuy }: {
             </div>
           );
         })}
+        {result?.reason === 'puntuacion' && <div className="my-score">{scoreFor(0)}</div>}
         {hand && !landscape && meChip}
         {me?.folded && <div className="stamp">No vas</div>}
         {chatOpen && (

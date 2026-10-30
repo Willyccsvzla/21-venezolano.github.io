@@ -1,4 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { WinFx } from './WinFx';
+import { Avatar } from './Avatar';
+import { playShing } from './sound';
 import { UserButton } from '@/lib/auth/gates';
 import type { Profile, Room } from '../services/backend';
 import type { LeaderboardEntry } from '@/lib/leaderboard.functions';
@@ -6,7 +9,7 @@ import type { ProgressionState } from '@/lib/progression.functions';
 import { useViewport } from './useViewport';
 import { inviteUrl } from './invite';
 import { hasPlayBillingBridge, hasRewardedAdBridge } from './native-commerce';
-import { CardBack } from './SpanishCard';
+import { CardBack, SpanishCard } from './SpanishCard';
 
 type LobbySection = 'salas' | 'recargar' | 'perfil' | 'mercado' | 'invitar' | 'ranking';
 type RoomCategory = 'public' | 'professional' | 'vip' | 'private';
@@ -51,6 +54,16 @@ export function Lobby({ profile, balance, rooms, onJoin, onCreate, onFindCode, o
   const [rankingBusy, setRankingBusy] = useState(false);
   const [rankingError, setRankingError] = useState('');
   const [market, setMarket] = useState<ProgressionState | null>(null);
+  const [trial, setTrial] = useState<{ tier: 'basic' | 'gold' | 'black'; n: number } | null>(null);
+  const [flipKey, setFlipKey] = useState('');
+  const tryItem = (id: string, kind: string) => {
+    if (kind === 'effect') { setTrial({ tier: id === 'effect-win-gold' ? 'gold' : 'basic', n: Date.now() }); return; }
+    if (kind === 'deck') playShing(id === 'deck-plata' ? 'silver' : id === 'deck-oro' ? 'gold' : 'all-black');
+    else if (id === 'back-all-black') setTrial({ tier: 'black', n: Date.now() });
+    else if (kind === 'back') playShing(id.includes('silver') ? 'silver' : 'gold');
+    setFlipKey(''); requestAnimationFrame(() => setFlipKey(id));
+    setTimeout(() => setFlipKey((k) => (k === id ? '' : k)), 900);
+  };
   const [marketBusy, setMarketBusy] = useState(false);
   const [marketError, setMarketError] = useState('');
   const [marketStatus, setMarketStatus] = useState('');
@@ -192,9 +205,10 @@ export function Lobby({ profile, balance, rooms, onJoin, onCreate, onFindCode, o
 
   return (
     <div className="screen lobby">
+      {trial && <WinFx key={trial.n} tier={trial.tier} name={profile.nick} avatar={profile.avatar} onDone={() => setTrial(null)} />}
       <header className="bar">
         <div className="auth-chip"><UserButton /></div>
-        <div className="me"><span className={`av-sm frame-${profile.frame}`}>{profile.avatar}</span> {profile.nick}</div>
+        <div className="me"><Avatar emoji={profile.avatar} photo={profile.photo} frame={profile.frame} className="av-sm pav-chip" /> {profile.nick}</div>
         <button className="bal btnlike" onClick={() => setSection('recargar')} data-testid="balance" aria-label={`Recargar fichas. Saldo ${balance}`}>
           🪙 {balance} <small>+</small>
         </button>
@@ -296,7 +310,7 @@ export function Lobby({ profile, balance, rooms, onJoin, onCreate, onFindCode, o
           <section className="feature-panel" aria-labelledby="profile-title">
             <h2 id="profile-title">Tu perfil</h2>
             <form className="profile-form panel" onSubmit={saveProfile}>
-              <div className={`profile-avatar profile-frame-${profile.frame}`} aria-hidden="true">{editAvatar}</div>
+              <Avatar emoji={editAvatar} photo={profile.photo} frame={market?.currentFrame ?? profile.frame} className="pav-profile" />
               <label className="lbl" htmlFor="profile-nick">Apodo</label>
               <input id="profile-nick" value={editNick} maxLength={16} onChange={(e) => setEditNick(e.target.value)} required />
               <fieldset className="avatar-picker">
@@ -341,23 +355,29 @@ export function Lobby({ profile, balance, rooms, onJoin, onCreate, onFindCode, o
               {market?.items.map((item) => {
                 const isEquipped = item.id.startsWith('frame-')
                   ? market.currentFrame === item.id.slice('frame-'.length)
+                  : item.kind === 'deck'
+                    ? market.currentDeck === item.id.slice('deck-'.length)
                   : item.kind === 'effect'
                     ? market.currentEffect === item.id.slice('effect-'.length)
                     : item.id.startsWith('back-') && market.currentBack === item.id.slice('back-'.length);
-                const isBlack = item.id === 'back-all-black';
+                const isBlack = item.id === 'back-all-black' || item.id === 'frame-all-black' || item.id === 'deck-allblack';
                 const nextCost = item.level === 0 ? item.price : item.price * item.level;
                 return <article className={isBlack ? 'feature-card all-black' : 'feature-card'} key={item.id}>
                   {item.kind === 'back'
-                    ? <CardBack className="market-back-preview" design={isBlack ? 'all-black' : item.id.includes('silver') ? 'silver' : 'gold'} />
-                    : <span className={`feature-icon${item.kind === 'effect' ? ' win-effect-preview' : ''}`} aria-hidden="true">{item.kind === 'effect' ? 'WIN!' : item.id.includes('silver') ? '🥈' : '🥇'}</span>}
+                    ? <CardBack className={`market-back-preview${flipKey === item.id ? ' flipping' : ''}`} design={isBlack ? 'all-black' : item.id.includes('silver') ? 'silver' : 'gold'} />
+                    : item.kind === 'deck' ? <span className={`deck-preview${flipKey === item.id ? ' flipping' : ''}`}>{[{ id: 'p1', rank: 1, suit: 'oros' }, { id: 'p2', rank: 12, suit: 'copas' }, { id: 'p3', rank: 7, suit: 'espadas' }].map((c) => <SpanishCard key={c.id} card={c as never} className="deck-card" skin={item.id.slice('deck-'.length)} />)}</span>
+                    : item.kind === 'frame' ? <Avatar emoji={profile.avatar} photo={profile.photo} frame={item.id.slice('frame-'.length)} className="pav-market" />
+                    : <span className={`feature-icon${item.kind === 'effect' ? ` win-effect-preview anim${item.id === 'effect-win-gold' ? ' gold' : ''}` : ''}`} aria-hidden="true">{item.kind === 'effect' ? 'WIN!' : item.id.includes('silver') ? '🥈' : '🥇'}</span>}
                   <h3>{item.name}</h3>
-                  <p>{isBlack ? (market.rank === 1 ? 'Recompensa exclusiva del primer puesto.' : 'Solo para quien ocupe el primer puesto del ranking.') : item.kind === 'back' ? `Nivel ${item.level}/${item.maxLevel} · mejora el reverso de tus cartas.` : item.kind === 'effect' ? 'Aparece junto al jugador que gana cada mano.' : 'Marco cosmético para tu perfil.'}</p>
+                  {(item.kind === 'effect' || item.kind === 'back' || item.kind === 'deck') && <button className="btn ghost sm try-btn" type="button" data-testid={`probar-${item.id}`} onClick={() => tryItem(item.id, item.kind)}>▶ Probar</button>}
+                  <p>{isBlack ? (market.rank === 1 ? (item.kind === 'deck' ? 'Mazo exclusivo del primer puesto: negro con bordes dorados.' : item.kind === 'frame' ? 'Marco exclusivo del primer puesto: obsidiana con destellos.' : 'Recompensa exclusiva del primer puesto: reverso negro y victoria All Black.') : 'Solo para quien ocupe el primer puesto del ranking.') : item.kind === 'back' ? `Nivel ${item.level}/${item.maxLevel} · mejora el reverso de tus cartas.` : item.kind === 'deck' ? 'Naipes laminados: mismas figuras y valores, fondo metálico con brillo. Se ve al voltear.' : item.kind === 'effect' ? (item.id === 'effect-win-gold' ? 'Destello por la mesa, lluvia de monedas y fanfarria. Lo ve toda la mesa.' : 'Placa WIN, confeti dorado y sonido de fichas. Lo ve toda la mesa.') : 'Marco animado para tu avatar. Lo ve toda la mesa.'}</p>
                   {!isBlack && item.canBuy && <button className="btn gold" type="button" disabled={Boolean(marketAction) || market.premiumBalance < nextCost} onClick={() => { void buyMarketItem(item.id); }}>
                     {marketAction === item.id ? 'Procesando…' : item.level ? `Mejorar · 💎 ${nextCost}` : `Comprar · 💎 ${nextCost}`}
                   </button>}
                   {item.level > 0 && <button className="btn ghost" type="button" disabled={Boolean(marketAction) || isEquipped || (isBlack && market.rank !== 1)} onClick={() => { void equipMarketItem(item.id); }}>
                     {isEquipped ? 'Equipado' : isBlack && market.rank !== 1 ? 'Reservado para el primer puesto' : 'Equipar'}
                   </button>}
+                  {item.kind === 'deck' && isEquipped && <button className="btn ghost sm" type="button" disabled={Boolean(marketAction)} onClick={() => { void equipMarketItem('deck-none'); }}>Usar mazo clásico</button>}
                   {!isBlack && item.level === 0 && market.premiumBalance < nextCost && <p className="note">Te faltan monedas premium. Recárgalas en Google Play.</p>}
                 </article>;
               })}

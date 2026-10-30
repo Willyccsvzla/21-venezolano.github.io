@@ -4,7 +4,9 @@ import type { Profile } from "../services/backend";
 import { leaveLive, play, rebuy, say, snapshot } from "@/lib/table.functions";
 import { CardBack, SpanishCard } from "./SpanishCard";
 import { inviteUrl } from "./invite";
-import { isMuted, playDeal, playShuffle, setMuted, unlockAudio } from "./sound";
+import { isMuted, playDeal, playShing, playShuffle, setMuted, unlockAudio, winTier } from "./sound";
+import { ScoreTag, WinFx } from "./WinFx";
+import { Avatar } from "./Avatar";
 import { useViewport } from "./useViewport";
 
 type Snap = Awaited<ReturnType<typeof snapshot>>;
@@ -25,6 +27,8 @@ export function MesaLive({ profile, onLeave, onBalance }: {
   const [mute, setMute] = useState(isMuted());
   const [inviteOpen, setInviteOpen] = useState(false);
   const heard = useRef("");
+  const fxSeen = useRef("");
+  const [fx, setFx] = useState<{ key: string; tier: "basic" | "gold" | "black"; name: string; avatar: string } | null>(null);
   const { w: vw, h: vh } = useViewport();
   const landscape = vw > vh;
 
@@ -71,6 +75,22 @@ export function MesaLive({ profile, onLeave, onBalance }: {
     }
     if (ids.length > prevIds.length) playDeal();
   }, [snap]);
+
+  useEffect(() => {
+    const r = snap?.result;
+    if (!snap || !r) return;
+    const key = `${snap.tableId}:${snap.handNumber}`;
+    if (fxSeen.current === key) return;
+    fxSeen.current = key;
+    const mine = r.winnerSeat === snap.seat;
+    const opp = snap.opponents.find((o) => o.seat === r.winnerSeat);
+    const tier = mine ? winTier(snap.you.winEffect, snap.cardBack) : winTier(opp?.winEffect, opp?.cardBack);
+    if (r.reason === "puntuacion") {
+      const premium = snap.opponents.find((o) => o.revealed?.length && ["silver", "gold", "all-black"].includes(o.cardBack ?? ""));
+      if (premium) playShing(premium.cardBack as "silver" | "gold" | "all-black");
+    }
+    if (tier) setFx({ key, tier, name: mine ? snap.you.name : opp?.name ?? "", avatar: mine ? profile.avatar : opp?.avatar ?? "" });
+  }, [snap, profile.avatar]);
 
   async function act(action: Action) {
     setBusy(true);
@@ -136,14 +156,21 @@ export function MesaLive({ profile, onLeave, onBalance }: {
           ? `Turno de ${opponents.find((o) => o.seat === snap.turnSeat)?.name ?? "la mesa"}…`
           : "";
 
+  const winScore = snap.result?.reason === "puntuacion" ? snap.result.scores.find((x) => x.seat === snap.result?.winnerSeat)?.score : undefined;
+  const scoreFor = (seat: number) => {
+    if (snap.result?.reason !== "puntuacion") return null;
+    const sc = snap.result.scores.find((x) => x.seat === seat);
+    if (!sc) return null;
+    return <ScoreTag score={sc.score} bust={sc.bust} winner={snap.result.winnerSeat === seat} diff={winScore !== undefined ? winScore - sc.score : undefined} />;
+  };
+
   const oppEl = (p: Snap["opponents"][number]) => (
     <div key={p.seat} className={`opp${p.isBot ? "" : " human"}${snap.turnSeat === p.seat ? " turn" : ""}${p.folded || p.sittingOut ? " out" : ""}${snap.result?.winnerSeat === p.seat ? " win" : ""}`}>
-      <div className="opp-av">
-        {p.avatar}
-        {snap.result?.winnerSeat === p.seat && p.winEffect === "win" && <span className="win-effect" aria-label="Efecto WIN">WIN!</span>}
+      <div className={`opp-av has-frame-${p.frame}`}>
+        <Avatar emoji={p.avatar} photo={p.photo} frame={p.frame} className="pav-fill" />
         {snap.mano === p.seat && <span className="mano-badge">M</span>}
         {p.revealed && p.revealed.length > 0 ? (
-          <span className="opp-cards show">{p.revealed.map((c) => <SpanishCard key={c.id} card={c} className="mini-face" />)}</span>
+          <span className={`opp-cards show${["silver", "gold", "all-black"].includes(p.cardBack ?? "") ? ` premium-${p.cardBack}` : ""}`}>{p.revealed.map((c) => <SpanishCard key={c.id} card={c} className="mini-face" skin={p.deck} />)}{scoreFor(p.seat)}</span>
         ) : !p.folded && !p.sittingOut && p.cardCount > 0 && (
           <span className="opp-cards">{Array.from({ length: p.cardCount }, (_, i) => <CardBack key={i} className="mini-back" design={p.cardBack} />)}</span>
         )}
@@ -187,6 +214,7 @@ export function MesaLive({ profile, onLeave, onBalance }: {
         </div>
       </header>
 
+      {fx && <WinFx key={fx.key} tier={fx.tier} name={fx.name} avatar={fx.avatar} onDone={() => setFx(null)} />}
       {!landscape && <div className="opps-strip">{opponents.map(oppEl)}</div>}
       {landscape && <div className="opps-side left">{opponents.slice(0, Math.ceil(opponents.length / 2)).map(oppEl)}</div>}
       {landscape && <div className="opps-side right">{opponents.slice(Math.ceil(opponents.length / 2)).map(oppEl)}</div>}
@@ -199,13 +227,13 @@ export function MesaLive({ profile, onLeave, onBalance }: {
         <div className="fan" style={{ ["--n" as string]: Math.max(myCards.length, 2) }} data-testid="my-cards">
           {(myCards.length ? myCards : [null, null]).map((c, i) => (
             <div key={c?.id ?? `back-${i}`} className={`my-card${snap.you.folded ? " folded" : ""}${iWon ? " won" : ""}`} style={{ ["--i" as string]: i }}>
-              {c ? <SpanishCard card={c} className="card-svg" /> : <CardBack className="card-svg" design={snap.cardBack ?? profile.cardBack} />}
+              {c ? <SpanishCard card={c} className="card-svg" skin={snap.you.deck} /> : <CardBack className="card-svg" design={snap.cardBack ?? profile.cardBack} />}
             </div>
           ))}
         </div>
+        {snap.result?.reason === "puntuacion" && <div className="my-score">{scoreFor(snap.seat)}</div>}
         <div className={`me-chip${waitingTurn ? " turn" : ""}`}>
-          <span className={`av-sm frame-${profile.frame}`}>{profile.avatar}</span>
-          {iWon && snap.you.winEffect === "win" && <span className="win-effect self-win" aria-label="Efecto WIN">WIN!</span>}
+          <Avatar emoji={profile.avatar} photo={snap.you.photo ?? profile.photo} frame={snap.you.frame ?? profile.frame} className="av-sm pav-chip" />
           <span className="pts"><b>{points ?? "—"}</b> pts</span>
           <span className="sub">{snap.mano === snap.seat && <span className="mano-badge inline">MANO</span>}<span className="cr">🪙 {snap.you.credits}{snap.you.contributed ? ` · ${snap.you.contributed}` : ""}</span></span>
         </div>

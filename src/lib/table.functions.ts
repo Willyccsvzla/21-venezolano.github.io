@@ -230,7 +230,8 @@ async function chats(tableId: string, userId: string) {
   return rows.reverse().map((m) => ({ id: m.id, name: m.name, text: m.body, mine: m.user_id === userId }));
 }
 
-async function pack(row: LiveRow, userId: string, version: number): Promise<Snap & { balance: number; version: number; cardBack: string; chat: { id: string; name: string; text: string; mine: boolean }[] }> {
+type Look = { photo: string | null; frame: string; deck: string | null };
+async function pack(row: LiveRow, userId: string, version: number): Promise<Omit<Snap, "opponents" | "you"> & { opponents: (Snap["opponents"][number] & Look)[]; you: Snap["you"] & Look; balance: number; version: number; cardBack: string; chat: { id: string; name: string; text: string; mine: boolean }[] }> {
   const snap = snapOf(row, userId);
   if (!snap) throw new Error("No estás en esta mesa");
   const sql = await getSql();
@@ -263,6 +264,27 @@ async function pack(row: LiveRow, userId: string, version: number): Promise<Snap
       where p.user_id = any(${opponentIds})
     `
     : [];
+  const looks = await sql<{ user_id: string; frame: string; image: string | null; deck: string | null }>`
+    with totals as (
+      select user_id, max(nick) as nick, count(*) filter (where won)::int as wins,
+        coalesce(sum(payout), 0)::int as chips_won, max(recorded_at) as last_at
+      from game_results group by user_id
+    ), first_place as (
+      select user_id from totals order by wins desc, chips_won desc, last_at asc, nick asc limit 1
+    )
+    select p.user_id,
+      (select case when i.item_id = 'deck-allblack' and p.user_id not in (select user_id from first_place) then null else substr(i.item_id, 6) end
+        from player_inventory i where i.user_id = p.user_id and i.equipped and i.item_id like 'deck-%' limit 1) as deck,
+      case when p.profile_frame = 'all-black' and p.user_id not in (select user_id from first_place)
+        then 'none' else coalesce(p.profile_frame, 'none') end as frame,
+      u.image
+    from players p left join "user" u on u.id = p.user_id
+    where p.user_id = any(${participantIds})
+  `;
+  const lookOf = (id: string | null | undefined): Look => {
+    const l = looks.find((x) => x.user_id === id);
+    return { frame: l?.frame ?? "none", deck: l?.deck ?? null, photo: l?.image && /^https:\/\//.test(l.image) ? l.image : null };
+  };
   const backsByUserId = new Map(opponentBacks.map((entry) => [entry.user_id, entry.card_back]));
   const stored = await sql<{ card_back: string }>`select card_back from players where user_id = ${userId}`;
   let cardBack = stored[0]?.card_back ?? "classic";
@@ -286,8 +308,9 @@ async function pack(row: LiveRow, userId: string, version: number): Promise<Snap
       ...opponent,
       cardBack: backsByUserId.get(row.seats[opponent.seat]?.userId ?? "") ?? "classic",
       winEffect: effectByUserId.get(row.seats[opponent.seat]?.userId ?? "") ?? null,
+      ...lookOf(row.seats[opponent.seat]?.userId),
     })),
-    you: { ...snap.you, winEffect: effectByUserId.get(userId) ?? null },
+    you: { ...snap.you, winEffect: effectByUserId.get(userId) ?? null, ...lookOf(userId) },
     balance: await balanceOf(userId), version, cardBack, chat: await chats(row.id, userId),
   };
 }

@@ -12,6 +12,7 @@ export interface Profile {
   nick: string;
   avatar: string;
   frame: string;
+  photo?: string | null;
   cardBack: string;
   adsRemoved: boolean;
   testMode: boolean;

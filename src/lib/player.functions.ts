@@ -9,6 +9,7 @@ export type PlayerProfile = {
   nick: string;
   avatar: string;
   frame: string;
+  photo?: string | null;
   cardBack: string;
   testMode: boolean;
   balance: number;
@@ -78,10 +79,14 @@ export const getPlayer = createServerFn({ method: "GET" })
     `;
     const cardBack = row.card_back === "all-black" && Number(rank[0]?.rank) !== 1 ? "classic" : row.card_back ?? "classic";
     if (cardBack !== row.card_back) await sql`update players set card_back = 'classic' where user_id = ${context.userId}`;
+    const userRow = await sql<{ image: string | null }>`select image from "user" where id = ${context.userId}`;
+    const photo = /^https:\/\//.test(userRow[0]?.image ?? "") ? userRow[0]!.image : null;
+    const frame = row.profile_frame === "all-black" && Number(rank[0]?.rank) !== 1 ? "none" : row.profile_frame ?? "none";
     return {
       nick: row.nick,
       avatar: row.avatar,
-      frame: row.profile_frame ?? "none",
+      photo,
+      frame,
       cardBack,
       testMode: Boolean(row.test_mode),
       balance: await balanceOf(context.userId),

@@ -19,7 +19,7 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 type Screen = "entrada" | "lobby" | "mesa";
 
 function profileOf(userId: string, p: PlayerProfile): Profile {
-  return { id: userId, nick: p.nick, avatar: p.avatar, frame: p.frame, cardBack: p.cardBack, adsRemoved: p.adsRemoved, testMode: p.testMode, createdAt: 0 };
+  return { id: userId, nick: p.nick, avatar: p.avatar, frame: p.frame, photo: p.photo, cardBack: p.cardBack, adsRemoved: p.adsRemoved, testMode: p.testMode, createdAt: 0 };
 }
 
 export default function App() {
