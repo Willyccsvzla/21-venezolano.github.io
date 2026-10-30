@@ -534,15 +534,6 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 .naipe.skin>img{display:block;width:100%;height:100%;object-fit:contain;position:relative;z-index:1}
 .naipe.skin::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;
   background:linear-gradient(115deg,transparent 30%,#ffffff8c 45%,transparent 58%);background-size:260% 100%;background-position:130% 0;mix-blend-mode:soft-light;animation:deckGleam 4.5s ease-in-out infinite}
-/* oro y plata: el blanco del naipe se vuelve metal (multiply) y las figuras se conservan */
-.skin-oro,.skin-plata{background:var(--metal)}
-.skin-oro>img,.skin-plata>img{mix-blend-mode:multiply;filter:contrast(1.12) saturate(1.1)}
-.skin-oro{--metal:repeating-radial-gradient(circle at 30% 20%,#0000 0 1px,#7a520614 1px 2px),repeating-linear-gradient(45deg,#fff3 0 1px,#0000 1px 3px),linear-gradient(135deg,#fff0b0 0%,#f4cc5a 22%,#c8901d 45%,#ffe58f 62%,#b67d12 82%,#f7d572 100%);box-shadow:inset 0 0 0 2px #8a5a08}
-.skin-plata{--metal:repeating-radial-gradient(circle at 70% 30%,#0000 0 1px,#4a566314 1px 2px),repeating-linear-gradient(-45deg,#fff4 0 1px,#0000 1px 3px),linear-gradient(135deg,#ffffff 0%,#d9e1e9 25%,#9aa8b6 48%,#f2f6fa 65%,#8d9aa8 85%,#e4eaf0 100%);box-shadow:inset 0 0 0 2px #5d6b79}
-/* all-black: fondo negro (inversión de luminancia preservando tono) con borde dorado */
-.skin-allblack{background:#000;box-shadow:inset 0 0 0 2px #e0b04a,inset 0 0 0 4px #000,inset 0 0 0 5px #c9d1da}
-.skin-allblack>img{filter:invert(1) hue-rotate(180deg) saturate(1.6) brightness(1.15) contrast(1.1)}
-.skin-allblack::after{background-image:linear-gradient(115deg,transparent 30%,#ffd76a66 45%,transparent 58%);mix-blend-mode:screen}
 @keyframes deckGleam{0%,55%{background-position:130% 0}85%,100%{background-position:-40% 0}}
 .mini-face.skin,.card-svg.skin{height:auto}
 .card-svg.skin{width:100%;height:100%}
@@ -553,3 +544,36 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 @media (prefers-reduced-motion:reduce){.naipe.skin::after{animation:none}}
 .room-categories{flex:0 0 auto;min-height:52px;scrollbar-width:none}
 .room-category{flex:0 0 auto;min-height:44px;padding:0 18px;border-radius:999px;white-space:nowrap}
+
+/* ===== Marcos premium v2: arte que sobresale + brillo + partículas ===== */
+.pav[data-frame]:not([data-frame="none"]) .pav-in{border-radius:16%;height:calc(var(--fs)*var(--k)*var(--hh)/100);top:auto;bottom:auto;inset:auto 0;margin:auto;position:relative}
+.pav[data-frame]:not([data-frame="none"]){height:auto;min-height:var(--fs)}
+.pav-ring,.pav-gems{display:none!important}
+.pav-art{position:absolute;z-index:3;pointer-events:none;width:calc(var(--fs)*var(--k));aspect-ratio:1;
+  left:calc(var(--fs)*var(--k)*var(--hx)/-100);top:calc(var(--fs)*var(--k)*var(--hy)/-100);filter:drop-shadow(0 4px 6px #000a)}
+.pav-art>img{width:100%;height:100%;display:block;animation:pavBreath 3.2s ease-in-out infinite}
+.pav-sheen{position:absolute;inset:0;-webkit-mask:var(--art) center/100% 100% no-repeat;mask:var(--art) center/100% 100% no-repeat;
+  background:linear-gradient(115deg,transparent 35%,#fffbe6d9 48%,transparent 60%);background-size:300% 100%;mix-blend-mode:screen;animation:pavSheen 2.8s ease-in-out infinite}
+.pf-all-black .pav-sheen{background-image:linear-gradient(115deg,transparent 35%,#ffffffcc 48%,transparent 60%)}
+.pav-art .pav-spark{position:absolute;width:9%;height:9%;top:calc(8% + (var(--i) * 37 % 80) * 1%);left:calc(4% + (var(--i) * 53 % 90) * 1%);
+  background:radial-gradient(circle,#fff 0 14%,transparent 15%),conic-gradient(from 45deg,transparent 0 10%,#fff 12%,transparent 14% 35%,#fff 37%,transparent 39% 60%,#fff 62%,transparent 64% 85%,#fff 87%,transparent 89%);
+  -webkit-mask:radial-gradient(circle,#000 30%,transparent 70%);mask:radial-gradient(circle,#000 30%,transparent 70%);
+  animation:pavTwinkle 2.2s ease-in-out infinite;animation-delay:calc(var(--i) * .33s);inset:auto}
+.pf-gold .pav-art .pav-spark{filter:drop-shadow(0 0 3px #ffd76a)} .pf-silver .pav-art .pav-spark{filter:drop-shadow(0 0 3px #9fd4ff)}
+.pf-basic .pav-art .pav-spark{filter:drop-shadow(0 0 3px #5effa8)} .pf-all-black .pav-art .pav-spark{filter:drop-shadow(0 0 4px #fff)}
+.pf-gold .pav-art{filter:drop-shadow(0 0 10px #ffcf4d88) drop-shadow(0 4px 6px #000a)}
+.pf-all-black .pav-art{filter:drop-shadow(0 0 12px #ffffff55) drop-shadow(0 4px 8px #000)}
+@keyframes pavSheen{0%,40%{background-position:120% 0}100%{background-position:-60% 0}}
+@keyframes pavBreath{50%{filter:brightness(1.18)}}
+.opp-av .pav-art{z-index:4}
+.opp-av:has(.pav-art) .mano-badge{z-index:6}
+.me-chip .pav.pav-chip{--fs:40px}
+.pav-profile{--fs:96px;margin:46px auto 30px}
+.pav-market{--fs:66px;margin:34px auto 22px}
+.lobby .bar .me .pav{--fs:40px;margin:0 16px 0 10px}
+@media (prefers-reduced-motion:reduce){.pav-art>img,.pav-sheen,.pav-art .pav-spark{animation:none}.pav-art .pav-spark{opacity:.85}}
+.opps-strip:has(.pav-art){padding-top:34px}
+.opp-av:has(.pav-art)+*,.opp-name{position:relative;z-index:5}
+
+/* mazos metálicos propios: arte completo, sin filtros */
+.skin{background:#000}.skin>img{display:block;width:100%;height:100%}

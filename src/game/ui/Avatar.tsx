@@ -1,29 +1,41 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
+import basicArt from "../assets/frames/basic.webp";
+import silverArt from "../assets/frames/silver.webp";
+import goldArt from "../assets/frames/gold.webp";
+import blackArt from "../assets/frames/all-black.webp";
+
+/** Arte de marco + caja del hueco (% de la imagen): x0, y0, x1, y1. */
+const FRAMES: Record<string, { src: string; hole: [number, number, number, number]; sparks: number }> = {
+  basic: { src: basicArt, hole: [24.3, 30.5, 75.6, 73.5], sparks: 3 },
+  silver: { src: silverArt, hole: [23.1, 27.5, 76.7, 73.5], sparks: 5 },
+  gold: { src: goldArt, hole: [24.7, 23.5, 75.2, 72.3], sparks: 7 },
+  "all-black": { src: blackArt, hole: [27.1, 29.5, 72.8, 69.3], sparks: 8 },
+};
 
 /**
- * Avatar del jugador: foto de Google (si existe y carga) o el emoji elegido, dentro de un marco cosmético.
- * Marcos: none | basic | silver | gold | all-black. Arte propio en CSS/SVG.
+ * Avatar del jugador: foto de Google (si existe y carga) o el emoji, dentro de un marco premium que sobresale.
+ * El arte del marco es propio (generado para el juego); brillo y partículas en CSS.
  */
 export function Avatar({ emoji, photo, frame = "none", className = "" }: { emoji: string; photo?: string | null; frame?: string; className?: string }) {
   const [failed, setFailed] = useState(false);
-  const f = ["basic", "silver", "gold", "all-black"].includes(frame) ? frame : "none";
+  const f = FRAMES[frame] ? frame : "none";
+  const def = FRAMES[f];
+  const style = def
+    ? ({ "--k": 100 / (def.hole[2] - def.hole[0]), "--hx": def.hole[0], "--hy": def.hole[1], "--hh": def.hole[3] - def.hole[1], "--art": `url(${def.src})` } as CSSProperties)
+    : undefined;
   return (
-    <span className={`pav pf-${f} ${className}`} data-frame={f}>
+    <span className={`pav pf-${f} ${className}`} data-frame={f} style={style}>
       <span className="pav-in">
         {photo && !failed
           ? <img src={photo} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" draggable={false} onError={() => setFailed(true)} />
           : <span className="pav-emoji">{emoji}</span>}
       </span>
-      {f !== "none" && (
-        <>
-          <span className="pav-ring" aria-hidden="true" />
-          <svg className="pav-gems" viewBox="0 0 60 14" aria-hidden="true">
-            <path className="g1" d="M10 7 L15 2 L20 7 L15 12Z" />
-            <path className="g0" d="M23 7 L30 0 L37 7 L30 14Z" />
-            <path className="g1" d="M40 7 L45 2 L50 7 L45 12Z" />
-          </svg>
-          {f !== "basic" && <><i className="pav-spark s1" aria-hidden="true" /><i className="pav-spark s2" aria-hidden="true" /></>}
-        </>
+      {def && (
+        <span className="pav-art" aria-hidden="true">
+          <img src={def.src} alt="" draggable={false} />
+          <span className="pav-sheen" />
+          {Array.from({ length: def.sparks }, (_, i) => <i key={i} className="pav-spark" style={{ ["--i" as string]: i } as CSSProperties} />)}
+        </span>
       )}
     </span>
   );
