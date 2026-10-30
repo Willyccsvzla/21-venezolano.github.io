@@ -6,10 +6,10 @@ import blackArt from "../assets/frames/all-black.webp";
 
 /** Arte de marco + caja del hueco (% de la imagen): x0, y0, x1, y1. */
 const FRAMES: Record<string, { src: string; hole: [number, number, number, number]; sparks: number }> = {
-  basic: { src: basicArt, hole: [24.3, 30.5, 75.6, 73.5], sparks: 3 },
-  silver: { src: silverArt, hole: [23.1, 27.5, 76.7, 73.5], sparks: 5 },
-  gold: { src: goldArt, hole: [24.7, 23.5, 75.2, 72.3], sparks: 7 },
-  "all-black": { src: blackArt, hole: [27.1, 29.5, 72.8, 69.3], sparks: 8 },
+  basic: { src: basicArt, hole: [19.3, 17.5, 80.7, 79.1], sparks: 3 },
+  silver: { src: silverArt, hole: [23.1, 16.6, 76.6, 76.2], sparks: 5 },
+  gold: { src: goldArt, hole: [23.8, 23.4, 76.0, 76.0], sparks: 7 },
+  "all-black": { src: blackArt, hole: [23.7, 23.6, 76.2, 76.6], sparks: 8 },
 };
 
 /**
