@@ -551,3 +551,5 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 .deck-preview .deck-card:nth-child(1){rotate:-8deg;translate:0 4px}.deck-preview .deck-card:nth-child(3){rotate:8deg;translate:0 4px}
 .deck-preview.flipping .deck-card{animation:proFlipShine .8s var(--pro-ease,ease)}
 @media (prefers-reduced-motion:reduce){.naipe.skin::after{animation:none}}
+.room-categories{flex:0 0 auto;min-height:52px;scrollbar-width:none}
+.room-category{flex:0 0 auto;min-height:44px;padding:0 18px;border-radius:999px;white-space:nowrap}
