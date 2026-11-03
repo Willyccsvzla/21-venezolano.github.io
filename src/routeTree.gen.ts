@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EliminarCuentaRouteImport } from './routes/eliminar-cuenta'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as ApiAdmobSsvRouteImport } from './routes/api/admob-ssv'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
@@ -19,9 +21,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EliminarCuentaRoute = EliminarCuentaRouteImport.update({
+  id: '/eliminar-cuenta',
+  path: '/eliminar-cuenta',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadRoute = PrivacidadRouteImport.update({
+  id: '/privacidad',
+  path: '/privacidad',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdmobSsvRoute = ApiAdmobSsvRouteImport.update({
@@ -37,34 +49,61 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/eliminar-cuenta': typeof EliminarCuentaRoute
   '/login': typeof LoginRoute
+  '/privacidad': typeof PrivacidadRoute
   '/api/admob-ssv': typeof ApiAdmobSsvRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/eliminar-cuenta': typeof EliminarCuentaRoute
   '/login': typeof LoginRoute
+  '/privacidad': typeof PrivacidadRoute
   '/api/admob-ssv': typeof ApiAdmobSsvRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/eliminar-cuenta': typeof EliminarCuentaRoute
   '/login': typeof LoginRoute
+  '/privacidad': typeof PrivacidadRoute
   '/api/admob-ssv': typeof ApiAdmobSsvRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/admob-ssv' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/eliminar-cuenta'
+    | '/login'
+    | '/privacidad'
+    | '/api/admob-ssv'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/admob-ssv' | '/api/auth/$'
-  id: '__root__' | '/' | '/login' | '/api/admob-ssv' | '/api/auth/$'
+  to:
+    | '/'
+    | '/eliminar-cuenta'
+    | '/login'
+    | '/privacidad'
+    | '/api/admob-ssv'
+    | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/eliminar-cuenta'
+    | '/login'
+    | '/privacidad'
+    | '/api/admob-ssv'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EliminarCuentaRoute: typeof EliminarCuentaRoute
   LoginRoute: typeof LoginRoute
+  PrivacidadRoute: typeof PrivacidadRoute
   ApiAdmobSsvRoute: typeof ApiAdmobSsvRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -78,11 +117,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/eliminar-cuenta': {
+      id: '/eliminar-cuenta'
+      path: '/eliminar-cuenta'
+      fullPath: '/eliminar-cuenta'
+      preLoaderRoute: typeof EliminarCuentaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidad': {
+      id: '/privacidad'
+      path: '/privacidad'
+      fullPath: '/privacidad'
+      preLoaderRoute: typeof PrivacidadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admob-ssv': {
@@ -104,7 +157,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EliminarCuentaRoute: EliminarCuentaRoute,
   LoginRoute: LoginRoute,
+  PrivacidadRoute: PrivacidadRoute,
   ApiAdmobSsvRoute: ApiAdmobSsvRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
